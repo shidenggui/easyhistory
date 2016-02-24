@@ -28,6 +28,8 @@ class Day:
         # self.SINA_API = self.SINA_API % ip
         print(self.SINA_API)
         stock_codes = self.get_all_stock_codes()
+        exists_codes = [code[:-4] for code in os.listdir(os.path.join(path, 'raw_data')) if code.endswith('.csv')]
+        stock_codes = set(stock_codes).difference(exists_codes)
         pool = ThreadPool(1)
         params = [(code, export, path) for code in stock_codes]
         pool.starmap(self.out_stock_history, params)
@@ -92,6 +94,8 @@ class Day:
 
     def out_stock_history(self, stock_code, export='csv', path='out'):
         all_history = self.get_all_history(stock_code)
+        if len(all_history) <= 0:
+            return
         if export == 'csv':
             parent_dir = os.path.join(path, 'raw_data')
             if not os.path.exists(path):
