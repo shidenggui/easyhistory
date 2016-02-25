@@ -30,7 +30,7 @@ class Day:
         stock_codes = self.get_all_stock_codes()
         exists_codes = [code[:-4] for code in os.listdir(os.path.join(path, 'raw_data')) if code.endswith('.csv')]
         stock_codes = set(stock_codes).difference(exists_codes)
-        pool = ThreadPool(1)
+        pool = ThreadPool(600)
         params = [(code, export, path) for code in stock_codes]
         pool.starmap(self.out_stock_history, params)
 
