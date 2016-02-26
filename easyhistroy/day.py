@@ -30,7 +30,7 @@ class Day:
         stock_codes = self.get_all_stock_codes()
         exists_codes = [code[:-4] for code in os.listdir(os.path.join(path, 'raw_data')) if code.endswith('.csv')]
         stock_codes = set(stock_codes).difference(exists_codes)
-        pool = ThreadPool(600)
+        pool = ThreadPool(500)
         params = [(code, export, path) for code in stock_codes]
         pool.starmap(self.out_stock_history, params)
 
@@ -154,7 +154,10 @@ class Day:
     def get_stock_time(self, stock_code):
         # 获取年月日
         url = self.SINA_API.format(stock_code=stock_code)
-        dom = PyQuery(url)
+        try:
+            dom = PyQuery(url)
+        except requests.ConnectionError:
+            return []
         year_options = dom('select[name=year] option')
         years = [o.text for o in year_options][::-1]
         return years
@@ -173,7 +176,7 @@ class Day:
         loop_nums = 10
         for i in range(loop_nums):
             try:
-                rep = requests.get(url, params, timeout=40, headers=headers)
+                rep = requests.get(url, params, timeout=0.1, headers=headers)
             except requests.ConnectionError:
                 time.sleep(60)
             except Exception as e:
