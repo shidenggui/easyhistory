@@ -4,7 +4,6 @@ import math
 import os
 import random
 import re
-import socket
 import time
 from datetime import datetime
 from multiprocessing.pool import Pool, ThreadPool
@@ -25,8 +24,6 @@ class Day:
         # 校验完整性
         # 记录出错的数据 / 或者
         # ip = socket.gethostbyname(self.SINA_API_HOSTNAME)
-        # self.SINA_API = self.SINA_API % ip
-        print(self.SINA_API)
         stock_codes = self.get_all_stock_codes()
         exists_codes = [code[:-4] for code in os.listdir(os.path.join(path, 'raw_data')) if code.endswith('.csv')]
         stock_codes = set(stock_codes).difference(exists_codes)
@@ -163,6 +160,8 @@ class Day:
         return years
 
     def get_quarter_history(self, stock_code, year, quarter):
+        if year < 1990:
+            return []
         params = dict(
                 year=year,
                 jidu=quarter
