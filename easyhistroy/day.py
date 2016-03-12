@@ -25,7 +25,10 @@ class Day:
         # 记录出错的数据 / 或者
         # ip = socket.gethostbyname(self.SINA_API_HOSTNAME)
         stock_codes = self.get_all_stock_codes()
-        exists_codes = [code[:-4] for code in os.listdir(os.path.join(path, 'raw_data')) if code.endswith('.csv')]
+        if os.path.exists(os.path.join(path, 'raw_data')):
+            exists_codes = [code[:-4] for code in os.listdir(os.path.join(path, 'raw_data')) if code.endswith('.csv')]
+        else:
+            exists_codes = set()
         stock_codes = set(stock_codes).difference(exists_codes)
         pool = ThreadPool(500)
         params = [(code, export, path) for code in stock_codes]
@@ -51,21 +54,21 @@ class Day:
         summary_path = os.path.join(path, 'raw_data', '{}_summary.json'.format(stock_code))
         with open(summary_path) as f:
             summary = json.load(f)
-        data_year = summary['year']
+        data_year = int(summary['year'])
         data_quarter = helpers.get_quarter(summary['month'])
         now_year = datetime.now().year
         now_quarter = helpers.get_quarter(datetime.now().month)
         updated_data = []
         for year in range(data_year, now_year + 1):
             for quarter in range(1, 5):
-                if year == data_year:
-                    if quarter < data_quarter:
-                        continue
-                elif year == now_year:
+                if year == now_year:
                     if quarter > now_quarter:
                         continue
+                elif year == data_year:
+                    if quarter < data_quarter:
+                        continue
                 updated_data += self.get_quarter_history(stock_code, year, quarter)
-        updated_data.sort(lambda day: day[0])
+        updated_data.sort(key=lambda day: day[0])
         return updated_data
 
     def update_file(self, updated_data, stock_code, path='out'):
@@ -76,9 +79,11 @@ class Day:
     def update_csv_file(self, file_path, updated_data):
         with open(file_path) as f:
             f_csv = csv.reader(f)
+            old_history = [l for l in f_csv][1:]
         latest_day = updated_data[-1][0]
-        old_history = [l for l in f_csv][1:]
-        old_clean_history = [day for day in old_history if day < latest_day]
+        update_start_day = updated_data[0][0]
+        # old_clean_history = [day for day in old_history if day < latest_day]
+        old_clean_history = [day for day in old_history if day[0] < update_start_day]
         new_history = old_clean_history + updated_data
         new_history.sort(key=lambda day: day[0])
         self.write_csv_file(file_path, new_history)
@@ -100,7 +105,6 @@ class Day:
             file_path = os.path.join(parent_dir, '{}.csv'.format(stock_code))
             print(file_path)
             self.write_csv_file(file_path, all_history)
-            # summary_file = os.path.join(parent_dir, '{}_summary.json'.format(stock_code))
             self.write_summary_file(stock_code, path, all_history)
 
         return all_history
@@ -117,11 +121,11 @@ class Day:
         with open(file_path, 'w') as f:
             latest_day = history[-1][0]
             year = latest_day[:4]
-            quarter = latest_day[5: 7]
+            month = latest_day[5: 7]
             day = latest_day[8: 9]
             summary = dict(
                     year=year,
-                    quarter=quarter,
+                    month=month,
                     day=day,
                     date=latest_day
             )
@@ -160,7 +164,7 @@ class Day:
         return years
 
     def get_quarter_history(self, stock_code, year, quarter):
-        if year < 1990:
+        if int(year) < 1990:
             return []
         params = dict(
                 year=year,
@@ -176,13 +180,14 @@ class Day:
         for i in range(loop_nums):
             try:
                 rep = requests.get(url, params, timeout=0.1, headers=headers)
+                break
             except requests.ConnectionError:
                 time.sleep(60)
             except Exception as e:
                 with open('error.log', 'a+') as f:
                     f.write(str(e))
 
-        print('end request %s' % stock_code)
+        print('end request {}, {}, {}'.format(stock_code, year, quarter))
         if rep is None:
             with open('error.txt', 'a+') as f:
                 f.write('{},{},{}'.format(stock_code, year, quarter))

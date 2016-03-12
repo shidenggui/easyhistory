@@ -15,4 +15,4 @@ def get_full_code(stock_code):
     return get_stock_type(stock_code) + stock_code
 
 def get_quarter(month):
-    return math.ceil(month / 3)
+    return math.ceil(int(month) / 3)
