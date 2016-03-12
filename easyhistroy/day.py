@@ -18,12 +18,15 @@ class Day:
     SINA_API = 'http://vip.stock.finance.sina.com.cn/corp/go.php/vMS_FuQuanMarketHistory/stockid/{stock_code}.phtml'
     SINA_API_HOSTNAME = 'vip.stock.finance.sina.com.cn'
     STOCK_CODE_API = 'http://218.244.146.57/static/all.csv'
+    def __init__(self):
+        self.raw_path = None
+        self.result_path = None
+        self.factor_cols = set('close', 'open', 'high', 'low', 'amount', 'volume')
 
     def init(self, export='csv', path='out'):
-        # 获取数据
-        # 校验完整性
-        # 记录出错的数据 / 或者
-        # ip = socket.gethostbyname(self.SINA_API_HOSTNAME)
+        path = os.path.join(path, 'day')
+        self.result_path = os.path.join(path, 'data')
+        self.raw_path = os.path.join(path, 'raw_data')
         stock_codes = self.get_all_stock_codes()
         if os.path.exists(os.path.join(path, 'raw_data')):
             exists_codes = [code[:-4] for code in os.listdir(os.path.join(path, 'raw_data')) if code.endswith('.csv')]
@@ -35,6 +38,7 @@ class Day:
         pool.starmap(self.out_stock_history, params)
 
     def update(self, export='csv', path='out'):
+        path = os.path.join('out', 'day')
         stock_codes = []
         for file in os.listdir(os.path.join(path, 'raw_data')):
             if not file.endswith('csv'):
@@ -49,6 +53,7 @@ class Day:
     def update_single_code(self, stock_code, path):
         updated_data = self.get_update_day_history(stock_code, path)
         self.update_file(updated_data, stock_code, path)
+        self.gen_history_result(stock_code)
 
     def get_update_day_history(self, stock_code, path='out'):
         summary_path = os.path.join(path, 'raw_data', '{}_summary.json'.format(stock_code))
@@ -100,12 +105,13 @@ class Day:
             return
         if export == 'csv':
             parent_dir = os.path.join(path, 'raw_data')
-            if not os.path.exists(path):
+            if not os.path.exists(parent_dir):
                 os.makedirs(parent_dir)
             file_path = os.path.join(parent_dir, '{}.csv'.format(stock_code))
             print(file_path)
             self.write_csv_file(file_path, all_history)
             self.write_summary_file(stock_code, path, all_history)
+            self.gen_history_result(stock_code)
 
         return all_history
 
@@ -130,6 +136,19 @@ class Day:
                     date=latest_day
             )
             json.dump(summary, f)
+
+    def gen_history_result(self, stock_code):
+        f_csv = csv.DictReader(stock_code)
+        day_history = [day for day in f_csv]
+        factor = max(day_history, key=lambda x: float(x['factor']))
+        for day_data in day_history:
+            self.convert_stock_data_type(day_data)
+            for i, col in enumerate(day_data):
+                if col in self.factor_cols:
+                    day_data[i] = round(col / factor, 2)
+        self.write_csv_file(self.result_path, day_history)
+
+
 
     def get_all_history(self, stock_code):
         years = self.get_stock_time(stock_code)
