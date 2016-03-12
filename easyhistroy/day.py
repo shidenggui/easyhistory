@@ -21,7 +21,7 @@ class Day:
     def __init__(self):
         self.raw_path = None
         self.result_path = None
-        self.factor_cols = set('close', 'open', 'high', 'low', 'amount', 'volume')
+        self.factor_cols = set(['close', 'open', 'high', 'low', 'amount', 'volume'])
 
     def init(self, export='csv', path='out'):
         path = os.path.join(path, 'day')
