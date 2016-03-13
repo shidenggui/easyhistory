@@ -18,22 +18,28 @@ class Day:
     SINA_API = 'http://vip.stock.finance.sina.com.cn/corp/go.php/vMS_FuQuanMarketHistory/stockid/{stock_code}.phtml'
     SINA_API_HOSTNAME = 'vip.stock.finance.sina.com.cn'
     STOCK_CODE_API = 'http://218.244.146.57/static/all.csv'
+
     def __init__(self):
         self.raw_path = None
         self.result_path = None
         self.factor_cols = set(['close', 'open', 'high', 'low', 'amount', 'volume'])
+        self.history_order = ['date', 'open', 'high', 'close', 'low', 'volume', 'amount', 'factor']
 
     def init(self, export='csv', path='out'):
         path = os.path.join(path, 'day')
         self.result_path = os.path.join(path, 'data')
         self.raw_path = os.path.join(path, 'raw_data')
+        if not os.path.exists(self.result_path):
+            os.makedirs(self.result_path)
+        if not os.path.exists(self.raw_path):
+            os.makedirs(self.raw_path)
         stock_codes = self.get_all_stock_codes()
         if os.path.exists(os.path.join(path, 'raw_data')):
             exists_codes = [code[:-4] for code in os.listdir(os.path.join(path, 'raw_data')) if code.endswith('.csv')]
         else:
             exists_codes = set()
         stock_codes = set(stock_codes).difference(exists_codes)
-        pool = ThreadPool(500)
+        pool = ThreadPool(100)
         params = [(code, export, path) for code in stock_codes]
         pool.starmap(self.out_stock_history, params)
 
@@ -138,17 +144,23 @@ class Day:
             json.dump(summary, f)
 
     def gen_history_result(self, stock_code):
-        f_csv = csv.DictReader(stock_code)
-        day_history = [day for day in f_csv]
-        factor = max(day_history, key=lambda x: float(x['factor']))
+        # TODO 思考读取是使用 字典 还是 列表? 主要是方便后面指标的添加计算
+        path = os.path.join(self.raw_path, '{}.csv'.format(stock_code))
+        with open(path) as f:
+            f_csv = csv.DictReader(f)
+            day_history = [day for day in f_csv]
+        factor = float(max(day_history, key=lambda x: float(x['factor']))['factor'])
+        new_history = []
         for day_data in day_history:
-            self.convert_stock_data_type(day_data)
-            for i, col in enumerate(day_data):
+            for col in enumerate(day_data):
                 if col in self.factor_cols:
-                    day_data[i] = round(col / factor, 2)
-        self.write_csv_file(self.result_path, day_history)
-
-
+                    day_data[col] = round(float(day_data[col]) / factor, 2)
+            ordered_item = []
+            for col in self.history_order:
+                ordered_item.append(day_data[col])
+            new_history.append(ordered_item)
+            stock_path = os.path.join(self.result_path, '{}.csv'.format(stock_code))
+        self.write_csv_file(stock_path, new_history)
 
     def get_all_history(self, stock_code):
         years = self.get_stock_time(stock_code)
@@ -198,7 +210,7 @@ class Day:
         loop_nums = 10
         for i in range(loop_nums):
             try:
-                rep = requests.get(url, params, timeout=0.1, headers=headers)
+                rep = requests.get(url, params, timeout=3, headers=headers)
                 break
             except requests.ConnectionError:
                 time.sleep(60)
