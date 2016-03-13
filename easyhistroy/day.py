@@ -152,7 +152,7 @@ class Day:
         factor = float(max(day_history, key=lambda x: float(x['factor']))['factor'])
         new_history = []
         for day_data in day_history:
-            for col in enumerate(day_data):
+            for col in day_data:
                 if col in self.factor_cols:
                     day_data[col] = round(float(day_data[col]) / factor, 2)
             ordered_item = []
