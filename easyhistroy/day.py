@@ -53,8 +53,10 @@ class Day:
         :return:
         """
         path = os.path.join(path, 'day')
+        self.result_path = os.path.join(path, 'data')
+        self.raw_path = os.path.join(path, 'raw_data')
         stock_codes = []
-        for file in os.listdir(os.path.join(path, 'raw_data')):
+        for file in os.listdir(self.raw_path):
             if not file.endswith('csv'):
                 continue
             stock_code = file[:-4]
@@ -148,7 +150,7 @@ class Day:
             latest_day = history[-1][0]
             year = latest_day[:4]
             month = latest_day[5: 7]
-            day = latest_day[8: 9]
+            day = latest_day[8:]
             summary = dict(
                     year=year,
                     month=month,
@@ -220,7 +222,7 @@ class Day:
         }
         print('request {},{},{}'.format(stock_code, year, quarter))
         url = self.SINA_API.format(stock_code=stock_code)
-        rep = None
+        rep = []
         loop_nums = 10
         for i in range(loop_nums):
             try:
@@ -245,7 +247,7 @@ class Day:
         raw_trows = dom('#FundHoldSharesTable tr')
         empty_history_nodes = 2
         if len(raw_trows) <= empty_history_nodes:
-            return None
+            return []
 
         unused_head_index_end = 2
         trows = raw_trows[unused_head_index_end:]
