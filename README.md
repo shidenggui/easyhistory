@@ -25,7 +25,7 @@ easyhistory.update('D', export='csv', path='history')
 
 ### 指标系统
 
-目前还在测试中，指标计算使用了 `talib` 和 `pandas`
+目前还在测试中，指标计算使用了 `talib` 和 `pandas`, 可以直接调用 `talib` 计算一百多种指标，包括 `MACD, EMA, MA` 等
 
 * tablib 安装: https://github.com/mrjbq7/ta-lib
 * pandas: pip install pandas
@@ -48,4 +48,4 @@ date
 
 ```
 
-注: [talib 可用指标](https://github.com/mrjbq7/ta-lib) 以及 [pandas 相关](https://github.com/pydata/pandas)
+注: [talib 可用指标以及相关参数](https://github.com/mrjbq7/ta-lib) 以及 [pandas 相关](https://github.com/pydata/pandas)
