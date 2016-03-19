@@ -4,7 +4,7 @@ import pandas as pd
 import talib
 
 
-class Indeicator(object):
+class Indicator(object):
     def __init__(self, stock_code, history):
         self.stock_code = stock_code
         self.history = history
@@ -30,7 +30,7 @@ class Indeicator(object):
 
 
 class History(object):
-    def __init__(self, path):
+    def __init__(self, dtype='D', path='history'):
         self.market = dict()
         data_path = os.path.join(path, 'day', 'data')
         self.load_csv_files(data_path)
@@ -42,7 +42,7 @@ class History(object):
             stock_code = stock_csv[:csv_ext_index_start]
 
             csv_path = os.path.join(path, stock_csv)
-            self.market[stock_code] = Indeicator(stock_code, pd.read_csv(csv_path, index_col='date'))
+            self.market[stock_code] = Indicator(stock_code, pd.read_csv(csv_path, index_col='date'))
 
     def __getitem__(self, item):
         return self.market[item]

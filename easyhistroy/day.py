@@ -26,7 +26,7 @@ class Day:
         self.factor_cols = set(['close', 'open', 'high', 'low', 'amount', 'volume'])
         self.history_order = ['date', 'open', 'high', 'close', 'low', 'volume', 'amount', 'factor']
 
-    def init(self, export='csv', path='out'):
+    def init(self, export='csv', path='history'):
         path = os.path.join(path, 'day')
         self.result_path = os.path.join(path, 'data')
         self.raw_path = os.path.join(path, 'raw_data')
@@ -46,7 +46,7 @@ class Day:
         func = partial(self.out_stock_history, export=export, path=path)
         pool.map(func, stock_codes)
 
-    def update(self, export='csv', path='out'):
+    def update(self, export='csv', path='history'):
         """ 更新已经下载的历史数据
         :param export: 历史数据的导出方式，目前支持持 csv
         :param path: 导出历史记录文件夹路径
@@ -75,7 +75,7 @@ class Day:
         self.update_file(updated_data, stock_code, path)
         self.gen_history_result(stock_code)
 
-    def get_update_day_history(self, stock_code, path='out'):
+    def get_update_day_history(self, stock_code, path='history'):
         summary_path = os.path.join(path, 'raw_data', '{}_summary.json'.format(stock_code))
         with open(summary_path) as f:
             summary = json.load(f)
@@ -96,7 +96,7 @@ class Day:
         updated_data.sort(key=lambda day: day[0])
         return updated_data
 
-    def update_file(self, updated_data, stock_code, path='out'):
+    def update_file(self, updated_data, stock_code, path='history'):
         csv_file_path = os.path.join(path, 'raw_data', '{}.csv'.format(stock_code))
         self.update_csv_file(csv_file_path, updated_data)
         self.write_summary_file(stock_code, path, updated_data)
@@ -119,7 +119,7 @@ class Day:
         random.shuffle(stock_codes)
         return stock_codes
 
-    def out_stock_history(self, stock_code, export='csv', path='out'):
+    def out_stock_history(self, stock_code, export='csv', path='history'):
         all_history = self.get_all_history(stock_code)
         if len(all_history) <= 0:
             return
