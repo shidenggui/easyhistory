@@ -9,6 +9,7 @@ from datetime import datetime
 from multiprocessing.pool import Pool, ThreadPool
 
 import requests
+from functools import partial
 from pyquery import PyQuery
 
 from . import helpers
@@ -33,30 +34,43 @@ class Day:
             os.makedirs(self.result_path)
         if not os.path.exists(self.raw_path):
             os.makedirs(self.raw_path)
+
         stock_codes = self.get_all_stock_codes()
         if os.path.exists(os.path.join(path, 'raw_data')):
             exists_codes = [code[:-4] for code in os.listdir(os.path.join(path, 'raw_data')) if code.endswith('.csv')]
         else:
             exists_codes = set()
         stock_codes = set(stock_codes).difference(exists_codes)
-        pool = ThreadPool(100)
-        params = [(code, export, path) for code in stock_codes]
-        pool.starmap(self.out_stock_history, params)
+
+        pool = ThreadPool(10)
+        func = partial(self.out_stock_history, export=export, path=path)
+        pool.map(func, stock_codes)
 
     def update(self, export='csv', path='out'):
-        path = os.path.join('out', 'day')
+        """ 更新已经下载的历史数据
+        :param export: 历史数据的导出方式，目前支持持 csv
+        :param path: 导出历史记录文件夹路径
+        :return:
+        """
+        path = os.path.join(path, 'day')
         stock_codes = []
         for file in os.listdir(os.path.join(path, 'raw_data')):
             if not file.endswith('csv'):
                 continue
             stock_code = file[:-4]
             stock_codes.append(stock_code)
+
         pool = Pool(10)
-        params = [(code, path) for code in stock_codes]
+        func = partial(self.update_single_code, path=path)
         if export.lower() in ['csv']:
-            pool.starmap(self.update_single_code, params)
+            pool.map(func, stock_codes)
 
     def update_single_code(self, stock_code, path):
+        """ 更新对应的股票文件历史行情
+        :param stock_code: 股票代码
+        :param path: 股票文件所在目录
+        :return:
+        """
         updated_data = self.get_update_day_history(stock_code, path)
         self.update_file(updated_data, stock_code, path)
         self.gen_history_result(stock_code)
