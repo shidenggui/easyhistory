@@ -1,3 +1,4 @@
+# coding:utf-8
 import math
 def get_stock_type(stock_code):
     """判断股票ID对应的证券市场
