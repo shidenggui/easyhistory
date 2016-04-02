@@ -181,12 +181,12 @@ class Day:
 
     def get_all_history(self, stock_code):
         years = self.get_stock_time(stock_code)
-        all_histroy = []
+        all_history = []
         for year in years:
             year_history = self.get_year_history(stock_code, year)
-            all_histroy += year_history
-        all_histroy.sort(key=lambda day: day[0])
-        return all_histroy
+            all_history += year_history
+        all_history.sort(key=lambda day: day[0])
+        return all_history
 
     def get_year_history(self, stock_code, year):
         year_history = []
