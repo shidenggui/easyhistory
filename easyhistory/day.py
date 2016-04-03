@@ -24,7 +24,7 @@ class Day:
     def __init__(self):
         self.raw_path = None
         self.result_path = None
-        self.factor_cols = set(['close', 'open', 'high', 'low', 'amount', 'volume'])
+        self.factor_cols = set(['close', 'open', 'high', 'low', 'amount'])
         self.history_order = ['date', 'open', 'high', 'close', 'low', 'volume', 'amount', 'factor']
 
     def init(self, export='csv', path='history'):
