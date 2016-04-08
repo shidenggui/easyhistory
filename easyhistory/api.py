@@ -11,5 +11,5 @@ def update_single_code(stock_code, path):
     return Day().update_single_code(stock_code, path)
 
 
-def update(export='csv', path='history'):
+def update(dtype='D', export='csv', path='history'):
     return Day().update(export, path)

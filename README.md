@@ -33,7 +33,7 @@ easyhistory.update('D', export='csv', path='history')
 #### 使用
 
 ```python
-his = easytrader.History(dtype='D', path='行情目录')
+his = easyhistory.History(dtype='D', path='行情目录')
 
 # MA 计算, 直接调用的 talib 的对应函数
 res = his['000001'].MA(5)
@@ -49,3 +49,9 @@ date
 ```
 
 注: [talib 可用指标以及相关参数](https://github.com/mrjbq7/ta-lib) 以及 [pandas 相关](https://github.com/pydata/pandas)
+
+
+### Q&A
+
+Q:安装 `talib` 提示找不到 `vcvarsall.bat` ?
+A: 去 `http://www.lfg.uci.edu/~gohlke/pythonlibs` 下载 `wheels`版本的包使用 `pip install xxx.whl` 安装
