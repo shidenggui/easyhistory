@@ -1,5 +1,6 @@
 # coding: utf-8
 import csv
+from datetime import timedelta
 import json
 import math
 import os
@@ -7,10 +8,10 @@ import random
 import re
 import time
 from datetime import datetime
+from functools import partial
 from multiprocessing.pool import Pool, ThreadPool
 
 import requests
-from functools import partial
 from pyquery import PyQuery
 
 from . import helpers
@@ -21,41 +22,36 @@ class Day:
     SINA_API_HOSTNAME = 'vip.stock.finance.sina.com.cn'
     STOCK_CODE_API = 'http://218.244.146.57/static/all.csv'
 
-    def __init__(self):
-        self.raw_path = None
-        self.result_path = None
-        self.factor_cols = set(['close', 'open', 'high', 'low', 'amount'])
+    def __init__(self, dtype='D', path='history'):
+        self.path = os.path.join(path, 'day')
+        self.result_path = os.path.join(self.path, 'data')
+        self.raw_path = os.path.join(self.path, 'raw_data')
+
+        self.factor_cols = {'close', 'open', 'high', 'low', 'amount'}
         self.history_order = ['date', 'open', 'high', 'close', 'low', 'volume', 'amount', 'factor']
 
-    def init(self, export='csv', path='history'):
-        path = os.path.join(path, 'day')
-        self.result_path = os.path.join(path, 'data')
-        self.raw_path = os.path.join(path, 'raw_data')
+    def init(self, export='csv'):
         if not os.path.exists(self.result_path):
             os.makedirs(self.result_path)
         if not os.path.exists(self.raw_path):
             os.makedirs(self.raw_path)
 
         stock_codes = self.get_all_stock_codes()
-        if os.path.exists(os.path.join(path, 'raw_data')):
-            exists_codes = [code[:-4] for code in os.listdir(os.path.join(path, 'raw_data')) if code.endswith('.csv')]
+        if os.path.exists(os.path.join(self.raw_path)):
+            exists_codes = [code[:-4] for code in os.listdir(self.raw_path) if code.endswith('.csv')]
         else:
             exists_codes = set()
         stock_codes = set(stock_codes).difference(exists_codes)
 
-        pool = ThreadPool(10)
-        func = partial(self.out_stock_history, export=export, path=path)
+        pool = ThreadPool(1)
+        func = partial(self.out_stock_history, export=export)
         pool.map(func, stock_codes)
 
-    def update(self, export='csv', path='history'):
+    def update(self, export='csv'):
         """ 更新已经下载的历史数据
         :param export: 历史数据的导出方式，目前支持持 csv
-        :param path: 导出历史记录文件夹路径
         :return:
         """
-        path = os.path.join(path, 'day')
-        self.result_path = os.path.join(path, 'data')
-        self.raw_path = os.path.join(path, 'raw_data')
         stock_codes = []
         for file in os.listdir(self.raw_path):
             if not file.endswith('csv'):
@@ -64,29 +60,32 @@ class Day:
             stock_codes.append(stock_code)
 
         pool = Pool(10)
-        func = partial(self.update_single_code, path=path)
+        func = partial(self.update_single_code)
         if export.lower() in ['csv']:
             pool.map(func, stock_codes)
 
-    def update_single_code(self, stock_code, path):
+    def update_single_code(self, stock_code):
         """ 更新对应的股票文件历史行情
         :param stock_code: 股票代码
-        :param path: 股票文件所在目录
         :return:
         """
-        updated_data = self.get_update_day_history(stock_code, path)
-        self.update_file(updated_data, stock_code, path)
+        updated_data = self.get_update_day_history(stock_code)
+        self.update_file(updated_data, stock_code)
         self.gen_history_result(stock_code)
 
-    def get_update_day_history(self, stock_code, path='history'):
-        summary_path = os.path.join(path, 'raw_data', '{}_summary.json'.format(stock_code))
+    def get_update_day_history(self, stock_code):
+        summary_path = os.path.join(self.raw_path, '{}_summary.json'.format(stock_code))
         with open(summary_path) as f:
             summary = json.load(f)
         data_year = int(summary['year'])
         data_quarter = helpers.get_quarter(summary['month'])
         now_year = datetime.now().year
-        now_quarter = helpers.get_quarter(datetime.now().month)
-        updated_data = []
+
+        # 使用下一天的日期作为更新起始日，避免季度末时多更新上一季度的内容
+        tomorrow = datetime.now() + timedelta(days=1)
+        now_quarter = helpers.get_quarter(tomorrow.month)
+
+        updated_data = list()
         for year in range(data_year, now_year + 1):
             for quarter in range(1, 5):
                 if year == now_year:
@@ -99,18 +98,16 @@ class Day:
         updated_data.sort(key=lambda day: day[0])
         return updated_data
 
-    def update_file(self, updated_data, stock_code, path='history'):
-        csv_file_path = os.path.join(path, 'raw_data', '{}.csv'.format(stock_code))
+    def update_file(self, updated_data, stock_code):
+        csv_file_path = os.path.join(self.raw_path, '{}.csv'.format(stock_code))
         self.update_csv_file(csv_file_path, updated_data)
-        self.write_summary_file(stock_code, path, updated_data)
+        self.write_summary_file(stock_code, updated_data)
 
     def update_csv_file(self, file_path, updated_data):
         with open(file_path) as f:
             f_csv = csv.reader(f)
             old_history = [l for l in f_csv][1:]
-        latest_day = updated_data[-1][0]
         update_start_day = updated_data[0][0]
-        # old_clean_history = [day for day in old_history if day < latest_day]
         old_clean_history = [day for day in old_history if day[0] < update_start_day]
         new_history = old_clean_history + updated_data
         new_history.sort(key=lambda day: day[0])
@@ -122,18 +119,15 @@ class Day:
         random.shuffle(stock_codes)
         return stock_codes
 
-    def out_stock_history(self, stock_code, export='csv', path='history'):
+    def out_stock_history(self, stock_code, export='csv'):
         all_history = self.get_all_history(stock_code)
         if len(all_history) <= 0:
             return
         if export == 'csv':
-            parent_dir = os.path.join(path, 'raw_data')
-            if not os.path.exists(parent_dir):
-                os.makedirs(parent_dir)
-            file_path = os.path.join(parent_dir, '{}.csv'.format(stock_code))
+            file_path = os.path.join(self.raw_path, '{}.csv'.format(stock_code))
             print(file_path)
             self.write_csv_file(file_path, all_history)
-            self.write_summary_file(stock_code, path, all_history)
+            self.write_summary_file(stock_code, all_history)
             self.gen_history_result(stock_code)
 
         return all_history
@@ -145,25 +139,21 @@ class Day:
                 write_line = '{},{},{},{},{},{},{},{}\n'.format(*day_line)
                 f.write(write_line)
 
-    def write_summary_file(self, stock_code, path, history):
-        file_path = os.path.join(path, 'raw_data', '{}_summary.json'.format(stock_code))
+    def write_summary_file(self, stock_code, history):
+        file_path = os.path.join(self.raw_path, '{}_summary.json'.format(stock_code))
         with open(file_path, 'w') as f:
-            latest_day = history[-1][0]
-            year = latest_day[:4]
-            month = latest_day[5: 7]
-            day = latest_day[8:]
+            latest_day = datetime.strptime(history[-1][0], '%Y-%m-%d')
             summary = dict(
-                    year=year,
-                    month=month,
-                    day=day,
+                    year=latest_day.year,
+                    month=latest_day.month,
+                    day=latest_day.day,
                     date=latest_day
             )
             json.dump(summary, f)
 
     def gen_history_result(self, stock_code):
-        # TODO 思考读取是使用 字典 还是 列表? 主要是方便后面指标的添加计算
-        path = os.path.join(self.raw_path, '{}.csv'.format(stock_code))
-        with open(path) as f:
+        csv_path = os.path.join(self.raw_path, '{}.csv'.format(stock_code))
+        with open(csv_path) as f:
             f_csv = csv.DictReader(f)
             day_history = [day for day in f_csv]
         factor = float(max(day_history, key=lambda x: float(x['factor']))['factor'])
@@ -212,8 +202,9 @@ class Day:
         return years
 
     def get_quarter_history(self, stock_code, year, quarter):
-        if int(year) < 1990:
-            return []
+        assert type(year) == int
+        if year < 1990:
+            return list()
         params = dict(
                 year=year,
                 jidu=quarter
@@ -223,7 +214,7 @@ class Day:
         }
         print('request {},{},{}'.format(stock_code, year, quarter))
         url = self.SINA_API.format(stock_code=stock_code)
-        rep = []
+        rep = list()
         loop_nums = 10
         for i in range(loop_nums):
             try:
@@ -239,7 +230,7 @@ class Day:
         if rep is None:
             with open('error.txt', 'a+') as f:
                 f.write('{},{},{}'.format(stock_code, year, quarter))
-            return []
+            return list()
         res = self.handle_quarter_history(rep.text)
         return res
 
@@ -248,12 +239,12 @@ class Day:
         raw_trows = dom('#FundHoldSharesTable tr')
         empty_history_nodes = 2
         if len(raw_trows) <= empty_history_nodes:
-            return []
+            return list()
 
         unused_head_index_end = 2
         trows = raw_trows[unused_head_index_end:]
 
-        res = []
+        res = list()
         for row_td_list in trows:
             td_list = row_td_list.getchildren()
             day_history = []
