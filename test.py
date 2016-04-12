@@ -1,5 +1,4 @@
-import easyhistroy
+import easyhistory
 
-# easyhistroy.update_single_code('000001', 'out')
-easyhistroy.init('D', export='csv', path='out')
+easyhistory.init('D', export='csv', path='out')
 
