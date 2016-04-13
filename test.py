@@ -1,4 +1,4 @@
 import easyhistory
 
-easyhistory.init('D', export='csv', path='out')
+easyhistory.update('D', export='csv', path='out')
 

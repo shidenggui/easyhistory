@@ -54,9 +54,9 @@ class Day:
         """
         stock_codes = []
         for file in os.listdir(self.raw_path):
-            if not file.endswith('csv'):
+            if not file.endswith('.json'):
                 continue
-            stock_code = file[:-4]
+            stock_code = file[:6]
             stock_codes.append(stock_code)
 
         pool = Pool(10)
@@ -147,7 +147,7 @@ class Day:
                     year=latest_day.year,
                     month=latest_day.month,
                     day=latest_day.day,
-                    date=latest_day
+                    date=latest_day.strftime('%Y-%m-%d')
             )
             json.dump(summary, f)
 
@@ -202,7 +202,7 @@ class Day:
         return years
 
     def get_quarter_history(self, stock_code, year, quarter):
-        assert type(year) == int
+        year = int(year)
         if year < 1990:
             return list()
         params = dict(
