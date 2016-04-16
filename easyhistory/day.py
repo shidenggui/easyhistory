@@ -182,7 +182,7 @@ class Day:
         year_history = []
         now_year = datetime.now().year
         now_month = datetime.now().month
-        end_quarter = 5 if str(year) != str(now_year) else math.ceil(now_month / 12) + 1
+        end_quarter = 5 if str(year) != str(now_year) else math.ceil(now_month / 3) + 1
         for quarter in range(1, end_quarter):
             quarter_data = self.get_quarter_history(stock_code, year, quarter)
             if quarter_data is None:
