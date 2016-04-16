@@ -1,20 +1,16 @@
 # coding: utf-8
-import csv
-from datetime import timedelta
-import json
 import math
-import os
-import random
 import re
 import time
 from datetime import datetime
-from functools import partial
-from multiprocessing.pool import Pool, ThreadPool
+from datetime import timedelta
+from multiprocessing.pool import ThreadPool
 
 import requests
 from pyquery import PyQuery
 
 from . import helpers
+from . import store
 
 
 class Day:
@@ -22,65 +18,34 @@ class Day:
     SINA_API_HOSTNAME = 'vip.stock.finance.sina.com.cn'
     STOCK_CODE_API = 'http://218.244.146.57/static/all.csv'
 
-    def __init__(self, dtype='D', path='history'):
-        self.path = os.path.join(path, 'day')
-        self.result_path = os.path.join(self.path, 'data')
-        self.raw_path = os.path.join(self.path, 'raw_data')
+    def __init__(self, path='history', export='csv'):
+        self.store = store.use(export=export, path=path, dtype='D')
 
-        self.factor_cols = {'close', 'open', 'high', 'low', 'amount'}
-        self.history_order = ['date', 'open', 'high', 'close', 'low', 'volume', 'amount', 'factor']
+    def init(self):
+        stock_codes = self.store.init_stock_codes
+        pool = ThreadPool(10)
+        pool.map(self.init_stock_history, stock_codes)
 
-    def init(self, export='csv'):
-        if not os.path.exists(self.result_path):
-            os.makedirs(self.result_path)
-        if not os.path.exists(self.raw_path):
-            os.makedirs(self.raw_path)
-
-        stock_codes = self.get_all_stock_codes()
-        if os.path.exists(os.path.join(self.raw_path)):
-            exists_codes = [code[:-4] for code in os.listdir(self.raw_path) if code.endswith('.csv')]
-        else:
-            exists_codes = set()
-        stock_codes = set(stock_codes).difference(exists_codes)
-
-        pool = ThreadPool(1)
-        func = partial(self.out_stock_history, export=export)
-        pool.map(func, stock_codes)
-
-    def update(self, export='csv'):
-        """ 更新已经下载的历史数据
-        :param export: 历史数据的导出方式，目前支持持 csv
-        :return:
-        """
-        stock_codes = []
-        for file in os.listdir(self.raw_path):
-            if not file.endswith('.json'):
-                continue
-            stock_code = file[:6]
-            stock_codes.append(stock_code)
-
-        pool = Pool(10)
-        func = partial(self.update_single_code)
-        if export.lower() in ['csv']:
-            pool.map(func, stock_codes)
+    def update(self):
+        """ 更新已经下载的历史数据 """
+        stock_codes = self.store.update_stock_codes
+        pool = ThreadPool(2)
+        pool.map(self.update_single_code, stock_codes)
 
     def update_single_code(self, stock_code):
         """ 更新对应的股票文件历史行情
         :param stock_code: 股票代码
         :return:
         """
-        updated_data = self.get_update_day_history(stock_code)
-        self.update_file(updated_data, stock_code)
-        self.gen_history_result(stock_code)
+        latest_date = self.store.get_his_stock_date(stock_code)
+        updated_data = self.get_update_day_history(stock_code, latest_date)
 
-    def get_update_day_history(self, stock_code):
-        summary_path = os.path.join(self.raw_path, '{}_summary.json'.format(stock_code))
-        with open(summary_path) as f:
-            summary = json.load(f)
-        data_year = int(summary['year'])
-        data_quarter = helpers.get_quarter(summary['month'])
+        self.store.write(stock_code, updated_data)
+
+    def get_update_day_history(self, stock_code, latest_date):
+        data_year = latest_date.year
+        data_quarter = helpers.get_quarter(latest_date.month)
         now_year = datetime.now().year
-
         # 使用下一天的日期作为更新起始日，避免季度末时多更新上一季度的内容
         tomorrow = datetime.now() + timedelta(days=1)
         now_quarter = helpers.get_quarter(tomorrow.month)
@@ -98,76 +63,11 @@ class Day:
         updated_data.sort(key=lambda day: day[0])
         return updated_data
 
-    def update_file(self, updated_data, stock_code):
-        csv_file_path = os.path.join(self.raw_path, '{}.csv'.format(stock_code))
-        self.update_csv_file(csv_file_path, updated_data)
-        self.write_summary_file(stock_code, updated_data)
-
-    def update_csv_file(self, file_path, updated_data):
-        with open(file_path) as f:
-            f_csv = csv.reader(f)
-            old_history = [l for l in f_csv][1:]
-        update_start_day = updated_data[0][0]
-        old_clean_history = [day for day in old_history if day[0] < update_start_day]
-        new_history = old_clean_history + updated_data
-        new_history.sort(key=lambda day: day[0])
-        self.write_csv_file(file_path, new_history)
-
-    def get_all_stock_codes(self):
-        rep = requests.get(self.STOCK_CODE_API)
-        stock_codes = re.findall(r'\r\n(\d+)', rep.content.decode('gbk'))
-        random.shuffle(stock_codes)
-        return stock_codes
-
-    def out_stock_history(self, stock_code, export='csv'):
+    def init_stock_history(self, stock_code):
         all_history = self.get_all_history(stock_code)
         if len(all_history) <= 0:
             return
-        if export == 'csv':
-            file_path = os.path.join(self.raw_path, '{}.csv'.format(stock_code))
-            print(file_path)
-            self.write_csv_file(file_path, all_history)
-            self.write_summary_file(stock_code, all_history)
-            self.gen_history_result(stock_code)
-
-        return all_history
-
-    def write_csv_file(self, file_path, history):
-        with open(file_path, 'w') as f:
-            f.write('date,open,high,close,low,volume,amount,factor\n')
-            for day_line in history:
-                write_line = '{},{},{},{},{},{},{},{}\n'.format(*day_line)
-                f.write(write_line)
-
-    def write_summary_file(self, stock_code, history):
-        file_path = os.path.join(self.raw_path, '{}_summary.json'.format(stock_code))
-        with open(file_path, 'w') as f:
-            latest_day = datetime.strptime(history[-1][0], '%Y-%m-%d')
-            summary = dict(
-                    year=latest_day.year,
-                    month=latest_day.month,
-                    day=latest_day.day,
-                    date=latest_day.strftime('%Y-%m-%d')
-            )
-            json.dump(summary, f)
-
-    def gen_history_result(self, stock_code):
-        csv_path = os.path.join(self.raw_path, '{}.csv'.format(stock_code))
-        with open(csv_path) as f:
-            f_csv = csv.DictReader(f)
-            day_history = [day for day in f_csv]
-        factor = float(max(day_history, key=lambda x: float(x['factor']))['factor'])
-        new_history = []
-        for day_data in day_history:
-            for col in day_data:
-                if col in self.factor_cols:
-                    day_data[col] = round(float(day_data[col]) / factor, 2)
-            ordered_item = []
-            for col in self.history_order:
-                ordered_item.append(day_data[col])
-            new_history.append(ordered_item)
-            stock_path = os.path.join(self.result_path, '{}.csv'.format(stock_code))
-        self.write_csv_file(stock_path, new_history)
+        self.store.write(stock_code, all_history)
 
     def get_all_history(self, stock_code):
         years = self.get_stock_time(stock_code)
@@ -264,7 +164,6 @@ class Day:
         :return: ['2016-02-19', 945.019, 949.701, 940.336, 935.653, 31889824.000, 320939648.000, 93.659]
         """
         date_index = 0
-
         for i, val in enumerate(day_data):
             if i == date_index:
                 continue
