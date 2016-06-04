@@ -53,12 +53,18 @@ class Day:
         updated_data = list()
         for year in range(data_year, now_year + 1):
             for quarter in range(1, 5):
+                if year == data_year:
+                    if quarter < data_quarter:
+                        continue
                 if year == now_year:
                     if quarter > now_quarter:
                         continue
-                elif year == data_year:
-                    if quarter < data_quarter:
-                        continue
+                # if year == now_year:
+                #     if quarter > now_quarter:
+                #         continue
+                # elif year == data_year:
+                #     if quarter < data_quarter:
+                #         continue
                 updated_data += self.get_quarter_history(stock_code, year, quarter)
         updated_data.sort(key=lambda day: day[0])
         return updated_data
