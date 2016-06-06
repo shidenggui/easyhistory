@@ -82,7 +82,7 @@ class CSVStore(Store):
         stock_codes = easyutils.stock.get_all_stock_codes()
         exists_codes = set()
         if os.path.exists(self.raw_path):
-            code_slice = slice(stop=-4)
+            code_slice = slice(-4)
             exists_codes = {code[code_slice] for code in os.listdir(self.raw_path) if code.endswith('.csv')}
         return set(stock_codes).difference(exists_codes)
 
