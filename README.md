@@ -54,4 +54,4 @@ date
 ### Q&A
 
 Q:安装 `talib` 提示找不到 `vcvarsall.bat` ?
-A: 去 `http://www.lfg.uci.edu/~gohlke/pythonlibs` 下载 `wheels`版本的包使用 `pip install xxx.whl` 安装
+A: 去 `http://www.lfd.uci.edu/~gohlke/pythonlibs` 下载 `wheels`版本的包使用 `pip install xxx.whl` 安装
