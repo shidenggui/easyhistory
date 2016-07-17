@@ -39,6 +39,9 @@ class Day:
         """
         latest_date = self.store.get_his_stock_date(stock_code)
         updated_data = self.get_update_day_history(stock_code, latest_date)
+        
+        if len(updated_data) == 0 or len(updated_data[0]) == 0:
+            return 
 
         self.store.write(stock_code, updated_data)
 
